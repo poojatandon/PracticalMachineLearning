@@ -1,0 +1,147 @@
+---
+title: "Activity Recognition Using Predictive Analytics"
+author: "Pooja Tandon"
+output:
+  pdf_document: default
+  html_document:
+    keep_md: yes
+---
+## Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har
+
+## Data Preprocessing 
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har.
+
+Load Libraries required:
+```{r }
+library(knitr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+library(RColorBrewer)
+library(RGtk2)
+library(gbm)
+```
+
+## Loading Data
+```{r}
+train_url<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training_data<- read.csv(url(train_url))
+testing_data<- read.csv(url(test_url))
+dim(training_data)
+dim(testing_data)
+```
+
+##Data Cleansing
+Removing Variables which are having Nearly Zero Variance.
+```{r}
+nzv <- nearZeroVar(training_data)
+
+train_data <- training_data[,-nzv]
+test_data <- testing_data[,-nzv]
+
+dim(train_data)
+
+dim(test_data)
+na_val_col <- sapply(train_data, function(x) mean(is.na(x))) > 0.95
+train_data <- train_data[,na_val_col == FALSE]
+test_data <- test_data[,na_val_col == FALSE]
+
+dim(train_data)
+dim(test_data) 
+train_data<- train_data[, 8:59]
+test_data<- test_data[, 8:59]
+dim(train_data)
+dim(test_data)
+```
+
+## Data Partioning
+In this we will seggregate our train_data in two parts “training”(60% of data) and “testing”(40% of data)/ Validateion set.
+
+```{r}
+inTrain<- createDataPartition(train_data$classe, p=0.6, list=FALSE)
+inTrain<- createDataPartition(train_data$classe, p=0.6, list=FALSE)
+training<- train_data[inTrain,]
+testing<- train_data[-inTrain,]
+dim(training)
+```
+
+## Construct the Model using Cross Validation-
+Decision Tree Model and Prediction
+```{r}
+library(rattle)
+DT_model<- train(classe ~. , data=training, method= "rpart")
+fancyRpartPlot(DT_model$finalModel)
+```
+
+```{r}
+set.seed(21243)
+DT_prediction<- predict(DT_model, testing)
+confusionMatrix(DT_prediction, testing$classe)
+```
+
+
+From the Decision Tree Model we see the prediction accuracy is 57% which is not upto satisfactory level.
+
+
+## Random Forest Model and Prediction
+
+```{r}
+set.seed(26817)
+###Fit the model   
+RF_model<- train(classe ~. , data=training, method= "rf", ntree=100)
+###Prediction  
+RF_prediction<- predict(RF_model, testing)
+RF_cm<-confusionMatrix(RF_prediction, testing$classe)
+RF_cm
+
+###plot    
+plot(RF_cm$table, col=RF_cm$byClass, main="Random Forest Accuracy")
+
+```
+
+From the Random Forest Model we see the prediction accuracy is 99% which is close to perfect accuracy level.
+
+## Gradient Boosting Model and Prediction
+
+```{r}
+set.seed(25621)
+gbm_model<- train(classe~., data=training, method="gbm", verbose= FALSE)
+gbm_model$finalmodel
+
+###Prediction    
+
+gbm_prediction<- predict(gbm_model, testing)
+gbm_cm<-confusionMatrix(gbm_prediction, testing$classe)
+gbm_cm
+```
+
+From the Gradient Boosting Model we see the prediction accuracy is 96% which is satisfied.
+
+```{r}
+##we have taken Random Forest and Gradient Boosting Model because it reach to satisfied prediction level. we are compairing the both model which is more accurate.    
+RF_cm$overall
+gbm_cm$overall
+```
+## Conclusion
+we conclude that, Random Forest is more accurate than Gradient Boosting Model at upto 99% of accuracy level
+
+## Prediction - using Random Forest MOdel on testing data.
+
+```{r}
+prediction_test<- predict(RF_model, test_data)
+prediction_test
+
+```
